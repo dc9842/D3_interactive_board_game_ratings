@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<head>
+  <title>Games Rating: 2015 - 2019</title>
+  <meta charset="utf-8">
+  <script type="text/javascript" src="../lib/d3.v5.min.js"></script>
+  <script type="text/javascript" src="../lib/d3-dsv.min.js"></script>
+</head>
+
+<body>
+
+<div id="container"></div>
+
+<script>
+var margin = {top: 100, right: 20, bottom: 100, left: 100},
+    width = 950 - margin.left - margin.right,
+    height = 700 - margin.top - margin.bottom;
+var svg = d3.select("body").append("svg")
+	.attr("width",width+margin.left+margin.right)
+	.attr("height",height+margin.top+margin.bottom)
+	.attr("overflow","visible")
+	.attr("transform", "translate("+(margin.left)+","+margin.top+")");
+var bar_svg = d3.select("body").append("svg")
+		.attr("id","barchart")
+		.attr("overflow","visible")
+		.attr("width",width+margin.left+margin.right)
+		.attr("height",height+margin.top+margin.bottom)
+		.attr("transform", "translate("+(margin.left)+","+margin.top+")");
+d3.dsv(",","average-rating.csv", function(d) {
+  return {
+    name: d.name.slice(0,10),
+	year: +d.year,
+	average_rating: +(Math.floor(d.average_rating)), //round down
+	users_rated: +d.users_rated};})
+	.then(function(data) {
+	filtered_data = data.filter(function(d) { return d.year >= 2015 & d.year <= 2019});
+	
+	//console.log(filtered_data);
+
+	var nested_data = d3.nest()
+	  .key(function(d){return d.year}).sortKeys(d3.ascending)
+	  .key(function(d){return d.average_rating}).sortKeys(d3.ascending)
+	  .rollup(function(leaves){ return {"year":leaves[0].year, "leaves":leaves, "count":leaves.length}})
+	  .entries(filtered_data);	
+	//console.log("nested data", nested_data);
+	
+	//Fill in nested data with empty count
+	for (let i=0; i<nested_data.length; i++) { //iterate throgh years
+		let existingRatings = nested_data[i].values.map((v) => +v.key);
+		
+		for (let r=0;r<10;r++) { //0...9
+			if (!existingRatings.includes(r)) {
+				nested_data[i].values.push({key: `${r}`, value: {"count":0,
+																"year":parseInt(nested_data[i].key)}
+											}
+										);
+			}
+		}
+		nested_data[i].values.sort((a, b) => a.key > b.key ? 1 : -1);
+	}
+	console.log("after", nested_data);
+
+	var x_scale = d3.scaleLinear()
+	  .domain([0,d3.max(filtered_data, function(d) {  return d.average_rating})])
+	  .range([0, width]);
+	
+	var y_scale = d3.scaleLinear()
+	  .domain([0,532]) //need a better way to do this
+	  .range([height,0]);
+	
+	var lines = svg.append("g")
+	  .attr("id","lines");
+	
+	lines.selectAll()
+		.data(nested_data).enter()
+		.append("path")
+		.attr("d", function(d){
+            return d3.line()
+				//.x(function(d,i){return x_scale(i);})
+                .x(function(d){return x_scale(parseInt(d.key));})
+                .y(function(d){return y_scale(+d.value.count);})
+            (d.values);
+        })
+		.attr("fill","none")
+		.attr("stroke-width",2)
+		.attr("stroke",function(d){
+            if (d.key == '2015')
+                {return "brown";}
+            else if (d.key == '2016')
+                {return "pink";}
+            else if (d.key == '2017')
+                {return "grey";}
+            else if (d.key == '2018')
+                {return "yellow";}
+			else {return "teal"} //2019
+            });
+		
+	svg.append("g")
+	  .attr("id","x-axis-lines")
+	  .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x_scale));
+	  
+	svg.append("g")
+	  .attr("id","y-axis-lines")
+	  .call(d3.axisLeft(y_scale).ticks());
+	
+	var circles = svg.append("g")
+	  .attr("id","circles");
+	  
+	//circles.selectAll()
+	//.data(nested_data).enter()
+	//.selectAll().data(function(d){return d.values;}).enter()
+	//.append("circle")
+	//.attr("cx",function(d){return x_scale(d.key);})
+	//.attr("cy", function(d){return y_scale(+d.value.count);})
+	//.attr("r",3)
+	//.attr("fill",function(d){
+    //        if (d.value.year == '2015')
+    //            {return "brown";}
+    //        else if (d.value.year == '2016')
+    //            {return "pink";}
+    //        else if (d.value.year == '2017')
+    //            {return "grey";}
+    //        else if (d.value.year == '2018')
+    //            {return "yellow";}
+	//		else {return "teal"} //2019
+    //        })
+
+	svg.append("g")
+	  .attr("id","line_chart_title")
+	  .attr("text-anchor","middle")
+	  .attr("font-weight","bold")
+	  .attr("transform", "translate("+width/2+","+-10+")")
+	  .append("text").text("Board games by Rating 2015-2019")
+	  
+	svg.append("g")
+	  .attr("id","credit")
+	  .attr("text-anchor","middle")
+	  .attr("font-weight","bold")
+	  .attr("fill","blue")
+	  .attr("transform", "translate("+width/2+","+15+")")
+	  .append("text").text("dcheng65")
+	  
+	var legend = svg.append("g")
+	  .attr("id","legend")
+	  .attr("transform", "translate(750,50)");
+	 
+	legend.selectAll()
+	.data(nested_data).enter()
+	.append("circle")
+	.attr("transform", function(d,i) {return "translate(10,"+i*15+")"})
+	.attr("r",5)
+	.attr("fill",function(d){
+            if (d.key == '2015')
+                {return "brown";}
+            else if (d.key == '2016')
+                {return "pink";}
+            else if (d.key == '2017')
+                {return "grey";}
+            else if (d.key == '2018')
+                {return "yellow";}
+			else {return "teal"} //2019
+            });
+
+	legend.append("text")
+	  .attr("font-weight","bold")
+	  .text("2015")
+	  .attr("transform", "translate(20,5)");
+	legend.append("text")
+	  .attr("font-weight","bold")
+	  .text("2016")
+	  .attr("transform", "translate(20,20)");
+	legend.append("text")
+	  .attr("font-weight","bold")
+	  .text("2017")
+	  .attr("transform", "translate(20,35)");
+	legend.append("text")
+	  .attr("font-weight","bold")
+	  .text("2018")
+	  .attr("transform", "translate(20,50)");
+	legend.append("text")
+	  .attr("font-weight","bold")
+	  .text("2019")
+	  .attr("transform", "translate(20,65)");
+
+	svg.append("text")
+	  .text("Rating") //x axis label
+	  .attr("font-weight","bold")
+	  .attr("text-anchor","middle")
+	  .attr("transform", "translate("+width/2+","+(height+25)+")");
+	svg.append("text")
+	  .text("Count") //y axis label
+	  .attr("font-weight","bold")
+	  .attr("text-anchor","middle")
+	  .attr("transform", "translate("+-45+","+(height/2)+") rotate(-90)");
+	
+	var bars = bar_svg.append("g")
+	      .attr("id","bars");
+	var x_axis_bars = bar_svg.append("g")
+		.attr("id","x-axis-bars")
+		.attr("transform", "translate(0," + height + ")");
+	var y_axis_bars = bar_svg.append("g")
+		  .attr("id","y-axis-bars");
+	var bar_chart_title = bar_svg.append("g")
+		  .attr("id","bar_chart_title")
+		  .attr("font-weight","bold")
+		  .attr("text-anchor","middle")
+		  .attr("transform", "translate("+(width/2)+","+-10+")");
+	var bar_chart_title_text = bar_chart_title.append("text");
+	
+	var bar_x_axis_label = bar_svg.append("g")
+	      .attr("id","bar_x_axis_label")
+		  .attr("font-weight","bold")
+		  .attr("text-anchor","middle")
+		  .attr("transform", "translate("+(width/2)+","+(height+25)+")");
+	var bar_x_axis_label_text = bar_x_axis_label.append("text");
+	
+	var bar_y_axis_label = bar_svg.append("g")
+	      .attr("id", "bar_y_axis_label")
+		  .attr("font-weight","bold")
+		  .attr("text-anchor","middle")
+		  .attr("transform", "translate("+-60+","+(height/2)+") rotate(-90)");
+	var bar_y_axis_label_text = bar_y_axis_label.append("text");
+	
+	function mouse_over(){
+		d3.select(this).attr("r",10) //make circle bigger for focus
+		
+		var selected_data = this.__data__;
+		console.log(selected_data); //{key:"5", value: year, leaves, count...}
+		
+		//ONLY SHOW BAR CHART IF HIGHER THAN 0
+		if (selected_data.value.count > 0) {
+		
+		bar_svg.selectAll("*").style("display","block");
+		//bar_svg.style("display","block");
+		//bars.style("display","block");
+		var top_values = selected_data.value.leaves.sort((a,b) => b.users_rated-a.users_rated).slice(0,5);
+		console.log(top_values);
+		var bar_x_scale = d3.scaleLinear()
+		  .domain([0, d3.max(top_values, function(d) {return d.users_rated})])
+		  .range([0,width])
+		  
+		var bar_y_scale = d3.scaleBand()
+		  .domain(top_values.map(function(d){return d.name;}))
+		  .range([0,height])
+		  .padding(0.1);
+		console.log("x domain",bar_x_scale.domain())
+		console.log("y domain", bar_y_scale.domain())
+		
+		bars.exit().remove();
+		bars.selectAll(".bar")
+		  .data(top_values).enter().append("rect").merge(bars)
+		  .attr("x",0)
+		  .attr("height", function(d) {return bar_y_scale.bandwidth();})
+		  .attr("y", function(d){return bar_y_scale(d.name)})
+		  .attr("width", function(d) {return bar_x_scale(d.users_rated)})
+		  .attr("fill","violet")
+		
+		x_axis_bars.call(d3.axisBottom(bar_x_scale).tickSizeInner([-height]));
+		y_axis_bars.call(d3.axisLeft(bar_y_scale)); 
+		
+		var disp_year = selected_data.value.year;
+		var disp_rating = selected_data.key;
+		bar_chart_title_text.text("Top 5 Most Rated Games of "+`${disp_year}`+" with Rating "+`${disp_rating}`)
+	  
+		bar_x_axis_label_text.text("Number of users")
+		bar_y_axis_label_text.text("Games")
+	  
+		}
+	}
+	function mouse_out(){
+		d3.select(this).attr("r",5) //return to orig size
+		//hide barchart
+		bar_svg.selectAll("*").style("display","none");
+		//bars.style("display","none");
+	}
+	
+	
+	
+	circles.selectAll()
+	.data(nested_data).enter().selectAll()
+	.data(function(d){return d.values;}).enter()
+	.append("circle")
+	.attr("cx",function(d){return x_scale(parseInt(d.key));})
+	.attr("cy", function(d){return y_scale(+d.value.count);})
+	.attr("r",5)
+	.attr("fill",function(d){
+            if (d.value.year == '2015')
+                {return "brown";}
+            else if (d.value.year == '2016')
+                {return "pink";}
+            else if (d.value.year == '2017')
+                {return "grey";}
+            else if (d.value.year == '2018')
+                {return "yellow";}
+			else {return "teal"} //2019
+            })
+    .on("mouseover", mouse_over)
+	.on("mouseout", mouse_out);
+	
+	
+	
+	  
+	
+	
+	
+	
+	});
+</script>
+
+</body>
